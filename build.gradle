@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+}
+
+group 'ipave.mask4j'
+version '0.0.1'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.jayway.jsonpath:json-path:2.7.0'
+
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.14.1'
+    testImplementation 'com.google.code.gson:gson:2.10'
+    testImplementation 'org.codehaus.jettison:jettison:1.5.3'
+    testImplementation 'org.json:json:20220924'
+    testImplementation 'org.apache.tapestry:tapestry-json:5.8.2'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+test {
+    useJUnitPlatform()
+}
