@@ -1,8 +1,9 @@
 package ipave.mask4j.core;
 
-import com.jayway.jsonpath.*;
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
 import com.jayway.jsonpath.spi.json.JsonProvider;
-import javafx.util.Pair;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -41,8 +42,8 @@ public class JsonMasker {
         JsonProvider jsonProvider = jsonMaskerConfiguration.getJsonWayConfiguration().jsonProvider();
         DocumentContext documentContext = JsonPath.using(jsonProvider).parse(json);
         for (Pair<JsonPath, MaskFunction> maskFunctionByPath : maskFunctionsByPath) {
-            JsonPath jsonPath = maskFunctionByPath.getKey();
-            MaskFunction maskFunction = maskFunctionByPath.getValue();
+            JsonPath jsonPath = maskFunctionByPath.getFirst();
+            MaskFunction maskFunction = maskFunctionByPath.getSecond();
             processMasking(documentContext, jsonProvider, jsonPath, maskFunction);
         }
         return documentContext.jsonString();
@@ -59,7 +60,8 @@ public class JsonMasker {
                     Object unwrappedValue = jsonProvider.unwrap(foundNode);
                     documentContext.set(jsonPath, maskFunction.mask(unwrappedValue.toString()));
                 } else if (maskRecursively) {
-                    traverseTree(documentContext, foundNode, jsonPath, maskFunction, 0);
+                    traverseTree(foundNode, null, null, foundNode, maskFunction, 0);
+                    documentContext.set(jsonPath, foundNode);
                 }
             } catch (PathNotFoundException e) {
                 if (throwWhenCantFindTarget) {
@@ -96,46 +98,43 @@ public class JsonMasker {
      * Recursive traverse of json tree, limited recursion depth with JsonMaskerConfiguration.recursionDepth.
      * Makes dfs and masks only primitive nodes with provided mask function.
      *
-     * @param documentContext JsonWay document context with specific json provider
-     * @param foundNode       node which was found at path 'jsonPath'
-     * @param jsonPath        current jsonPath
-     * @param maskFunction    function to be applied to all found nodes
-     * @param recursionLevel  current recursion level
+     * @param parentNode     parent node of 'jsonPath'
+     * @param key            parent key if parent is object
+     * @param index          parent index if parent is array
+     * @param foundNode      node which was found at path 'jsonPath'
+     * @param maskFunction   function to be applied to all found nodes
+     * @param recursionLevel current recursion level
      */
-    private void traverseTree(DocumentContext documentContext, Object foundNode, JsonPath jsonPath, MaskFunction maskFunction, int recursionLevel) {
+    private void traverseTree(Object parentNode, String key, Integer index, Object foundNode, MaskFunction maskFunction, int recursionLevel) {
         if (recursionLevel > jsonMaskerConfiguration.getRecursionDepth()) {
-            throw new IllegalStateException("Too deep recursion for path " + jsonPath);
+            throw new IllegalStateException("Too deep recursion for path " + "jsonPath");
         }
         if (foundNode == null) return;
         JsonProvider jsonProvider = jsonMaskerConfiguration.getJsonWayConfiguration().jsonProvider();
         if (isPrimitive(foundNode)) {
             Object unwrappedValue = jsonProvider.unwrap(foundNode);
-            documentContext.set(jsonPath, maskFunction.mask(unwrappedValue.toString()));
+            if (key != null) {
+                jsonProvider.setProperty(parentNode, key, maskFunction.mask(unwrappedValue.toString()));
+            } else {
+                jsonProvider.setArrayIndex(parentNode, index, maskFunction.mask(unwrappedValue.toString()));
+            }
         } else {
             if (jsonProvider.isArray(foundNode)) {
                 Iterator<?> iterator = jsonProvider.toIterable(foundNode).iterator();
-                int index = 0;
+                int i = 0;
                 while (iterator.hasNext()) {
-                    traverseTree(documentContext, iterator.next(), createArrayJsonPath(jsonPath, index), maskFunction, recursionLevel + 1);
-                    index++;
+                    traverseTree(foundNode, null, i, iterator.next(), maskFunction, recursionLevel + 1);
+                    i++;
                 }
             } else if (jsonProvider.isMap(foundNode)) {
                 Collection<String> propertiesKeys = jsonProvider.getPropertyKeys(foundNode);
                 for (String propertyKey : propertiesKeys) {
                     Object value = jsonProvider.getMapValue(foundNode, propertyKey);
-                    traverseTree(documentContext, value, createMapJsonPath(jsonPath, propertyKey), maskFunction, recursionLevel + 1);
+                    traverseTree(foundNode, propertyKey, null, value, maskFunction, recursionLevel + 1);
                 }
             } else {
                 throw new IllegalStateException("Unsupported type of node" + foundNode.getClass());
             }
         }
-    }
-
-    private JsonPath createMapJsonPath(JsonPath jsonPath, String propertyKey) {
-        return JsonPath.compile(jsonPath.getPath() + "['" + propertyKey + "']");
-    }
-
-    private JsonPath createArrayJsonPath(JsonPath jsonPath, int index) {
-        return JsonPath.compile(jsonPath.getPath() + "[" + index + "]");
     }
 }
