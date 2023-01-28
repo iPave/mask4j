@@ -61,9 +61,10 @@ public class JsonMaskerTest {
 
         String maskedJson = jsonMasker.mask(
                 json,
-                JsonPath.compile("$.store.book[0].category"),
+                JsonPath.compile("$.store.book[*].category"),
                 target -> target.replaceAll(".", "*")
         );
+        System.out.println(maskedJson);
 
         JsonPath path = JsonPath.compile("$.store.book[0].category");
         String category = path.read(maskedJson);
@@ -271,7 +272,7 @@ public class JsonMaskerTest {
 
     @ParameterizedTest
     @ValueSource(classes = {
-//            GsonJsonProvider.class,
+            GsonJsonProvider.class,
             JacksonJsonProvider.class
     })
     public void shouldMaskObject(Class<JsonProvider> jsonProviderClass) throws InstantiationException, IllegalAccessException {
@@ -296,7 +297,6 @@ public class JsonMaskerTest {
                 target -> target.replaceAll(".", "*")
         );
 
-        System.out.println(maskedJson);
         assertEquals("*********", JsonPath.compile("$.store.books[0].category").read(maskedJson));
         assertEquals("**********", JsonPath.compile("$.store.books[0].author").read(maskedJson));
         assertEquals("**********************", JsonPath.compile("$.store.books[0].title").read(maskedJson));
